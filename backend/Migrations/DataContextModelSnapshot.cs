@@ -224,7 +224,7 @@ namespace HotDeskBookingSystem.Migrations
                     b.HasOne("HotDeskBookingSystem.Data.Models.OfficeFloor", "OfficeFloor")
                         .WithMany("Desks")
                         .HasForeignKey("OfficeFloorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("OfficeFloor");
@@ -235,7 +235,7 @@ namespace HotDeskBookingSystem.Migrations
                     b.HasOne("HotDeskBookingSystem.Data.Models.Office", "Office")
                         .WithMany("OfficeFloors")
                         .HasForeignKey("OfficeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Office");

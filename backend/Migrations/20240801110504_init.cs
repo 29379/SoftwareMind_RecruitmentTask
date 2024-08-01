@@ -81,7 +81,7 @@ namespace HotDeskBookingSystem.Migrations
                         column: x => x.OfficeId,
                         principalTable: "Offices",
                         principalColumn: "OfficeId",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -124,7 +124,7 @@ namespace HotDeskBookingSystem.Migrations
                         column: x => x.OfficeFloorId,
                         principalTable: "Floors",
                         principalColumn: "OfficeFloorId",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(

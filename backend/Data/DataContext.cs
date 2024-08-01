@@ -134,7 +134,7 @@ namespace HotDeskBookingSystem.Data
                 .HasMany(of => of.Desks)
                 .WithOne(d => d.OfficeFloor)
                 .HasForeignKey(d => d.OfficeFloorId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<OfficeFloor>()
                 .HasOne(of => of.Office)
@@ -152,7 +152,7 @@ namespace HotDeskBookingSystem.Data
                 .HasMany(o => o.OfficeFloors)
                 .WithOne(of => of.Office)
                 .HasForeignKey(of => of.OfficeId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             // - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         }
