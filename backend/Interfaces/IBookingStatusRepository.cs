@@ -4,7 +4,7 @@ namespace HotDeskBookingSystem.Interfaces
 {
     public interface IBookingStatusRepository
     {
-        Task<BookingStatus?> GetBookingStatusByIdAsync(int bookingStatusId);
+        Task<BookingStatus?> GetBookingStatusByNameAsync(string bookingStatusName);
         Task<IEnumerable<BookingStatus>> GetAllBookingStatusesAsync();
         Task<BookingStatus?> AddBookingStatusAsync(BookingStatus bookingStatus);
         Task<BookingStatus?> UpdateBookingStatusAsync(BookingStatus bookingStatus);

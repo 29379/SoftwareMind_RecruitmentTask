@@ -1,33 +1,53 @@
-﻿using HotDeskBookingSystem.Data.Models;
+﻿using HotDeskBookingSystem.Data;
+using HotDeskBookingSystem.Data.Models;
 using HotDeskBookingSystem.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace HotDeskBookingSystem.Repositories
 {
     public class BookingStatusRepository : IBookingStatusRepository
     {
-        public Task<BookingStatus?> AddBookingStatusAsync(BookingStatus bookingStatus)
-        {
-            throw new NotImplementedException();
+        private readonly DataContext _context;
+
+        public BookingStatusRepository(DataContext context) {
+            _context = context;
         }
 
-        public Task<BookingStatus?> DeleteBookingStatusAsync(int bookingStatusId)
+        public async Task<IEnumerable<BookingStatus>> GetAllBookingStatusesAsync()
         {
-            throw new NotImplementedException();
+            return await _context.BookingStatuses
+                .ToListAsync();
         }
 
-        public Task<IEnumerable<BookingStatus>> GetAllBookingStatusesAsync()
+        public async Task<BookingStatus?> GetBookingStatusByNameAsync(string bookingStatusName)
         {
-            throw new NotImplementedException();
+            return await _context.BookingStatuses
+                .FirstOrDefaultAsync(b => b.StatusName == bookingStatusName);
         }
-
-        public Task<BookingStatus?> GetBookingStatusByIdAsync(int bookingStatusId)
+        public async Task<BookingStatus?> AddBookingStatusAsync(BookingStatus bookingStatus)
         {
-            throw new NotImplementedException();
+            _context.BookingStatuses.Add(bookingStatus);
+            await _context.SaveChangesAsync();
+            return bookingStatus;
         }
 
         public Task<BookingStatus?> UpdateBookingStatusAsync(BookingStatus bookingStatus)
         {
             throw new NotImplementedException();
+        }
+
+        public async Task<BookingStatus?> DeleteBookingStatusAsync(int bookingStatusId)
+        {
+            var toBeDeleted = await _context.BookingStatuses
+                .FindAsync(bookingStatusId);
+            if (toBeDeleted != null)
+            {
+                _context.BookingStatuses
+                    .Remove(toBeDeleted);
+                await _context.SaveChangesAsync();
+                return toBeDeleted;
+            }
+            return null;
         }
     }
 }

@@ -1,48 +1,133 @@
-﻿using HotDeskBookingSystem.Data.Models;
+﻿using HotDeskBookingSystem.Data;
+using HotDeskBookingSystem.Data.Models;
 using HotDeskBookingSystem.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace HotDeskBookingSystem.Repositories
 {
     public class DeskRepository : IDeskRepository
     {
-        public Task<Desk?> AddDeskAsync(Desk desk)
+        private readonly DataContext _context;
+
+        public DeskRepository(DataContext context)
         {
-            throw new NotImplementedException();
+            _context = context;
         }
 
-        public Task<Desk?> DeleteDeskAsync(int deskId)
+        public async Task<Desk?> AddDeskAsync(Desk desk)
         {
-            throw new NotImplementedException();
+            _context.Add(desk);
+            await _context.SaveChangesAsync();
+            return desk;
         }
 
-        public Task<IEnumerable<Desk>> GetAllDesksAsync()
+        public async Task<Desk?> DeleteDeskAsync(int deskId)
         {
-            throw new NotImplementedException();
+            var toBeDeleted = _context.Desks
+                .Find(deskId);
+            if (toBeDeleted != null)
+            {
+                _context.Desks
+                    .Remove(toBeDeleted);
+                await _context.SaveChangesAsync();
+                return toBeDeleted;
+            }
+            return null;
         }
 
-        public Task<IEnumerable<Desk>> GetAvailableDesksByOfficeIdAsync(int officeId, DateTime timeOfReservation)
+        public async Task<IEnumerable<Desk>> GetAllDesksAsync()
         {
-            throw new NotImplementedException();
+            return await _context.Desks
+                .ToListAsync();
         }
 
-        public Task<Desk?> GetDeskByIdAsync(int deskId)
+        public async Task<IEnumerable<Desk>> GetAvailableDesksByOfficeIdAsync(int officeId, DateTime startReservation, DateTime endReservation)
         {
-            throw new NotImplementedException();
+            var floors = await _context.Floors
+                .Where(f => f.OfficeId == officeId)
+                .ToListAsync();
+            var availableDesks = new List<Desk>();
+            foreach (var floor in floors)
+            {
+                var desksPerFloor = await _context.Desks
+                    .Where(d => d.OfficeFloorId == floor.OfficeFloorId)
+                    .ToListAsync();
+
+                foreach (var desk in desksPerFloor)
+                {
+                    var bookingsForDesk = await _context.Bookings
+                        .Where(
+                            b => b.DeskId == desk.DeskId
+                                && 
+                            b.BookingStatusName == "BOOKED"
+                                &&
+                            (
+                                b.endTime > startReservation && b.endTime < endReservation
+                                    ||
+                                b.startTime > startReservation && b.startTime < endReservation
+                            )
+                        )
+                        .ToListAsync();
+                    if (bookingsForDesk.Count == 0)
+                    {
+                        availableDesks.Add(desk);
+                    }
+                }
+            }
+            return availableDesks;
         }
 
-        public Task<IEnumerable<Desk>> GetDesksByOfficeFloorIdAsync(int officeFloorId)
+        public async Task<Desk?> GetDeskByIdAsync(int deskId)
         {
-            throw new NotImplementedException();
+            return await _context.Desks
+                .FirstOrDefaultAsync(d => d.DeskId == deskId);
         }
 
-        public Task<IEnumerable<Desk>> GetDesksByOfficeIdAsync(int officeId)
+        public async Task<IEnumerable<Desk>> GetDesksByOfficeFloorIdAsync(int officeFloorId)
         {
-            throw new NotImplementedException();
+            return await _context.Desks
+                .Where(d => d.OfficeFloorId == officeFloorId)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Desk>> GetDesksByOfficeIdAsync(int officeId)
+        {
+            var floors = await _context.Floors
+                .Where(f => f.OfficeId == officeId)
+                .ToListAsync();
+
+            var desks = new List<Desk>();
+            foreach (var floor in floors)
+            {
+                var desksPerFloor = await _context.Desks
+                    .Where(d => d.OfficeFloorId == floor.OfficeFloorId)
+                    .ToListAsync();
+                desks.AddRange(desksPerFloor);
+            }
+            return desks;
         }
 
         public Task<Desk?> UpdateDeskAsync(Desk desk)
         {
             throw new NotImplementedException();
+        }
+
+        public async Task<bool> IsDeskAvailableAsync(int deskId, DateTime startReservation, DateTime endReservation)
+        {
+            var bookingsForDesk = await _context.Bookings
+                .Where(
+                    b => b.DeskId == deskId
+                        &&
+                    b.BookingStatusName == "BOOKED"
+                        &&
+                    (
+                        b.endTime > startReservation && b.endTime < endReservation
+                            ||
+                        b.startTime > startReservation && b.startTime < endReservation
+                    )
+                )
+                .ToListAsync();
+            return bookingsForDesk.Count == 0;
         }
     }
 }
