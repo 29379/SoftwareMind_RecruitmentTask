@@ -1,9 +1,10 @@
 using HotDeskBookingSystem.Data;
-using HotDeskBookingSystem.Interfaces;
+using HotDeskBookingSystem.Interfaces.Repositories;
+using HotDeskBookingSystem.Interfaces.ServiceInterfaces;
+using HotDeskBookingSystem.Interfaces.Services;
 using HotDeskBookingSystem.Repositories;
 using HotDeskBookingSystem.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Serialization;
@@ -40,6 +41,15 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminPolicy", policy => policy.RequireRole("ADMIN"));
+    options.AddPolicy("EmployeePolicy", policy => policy.RequireRole("EMPLOYEE", "ADMIN"));
+});
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 builder.Services.AddScoped<IAppUserRepository, AppUserRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IBookingStatusRepository, BookingStatusRepository>();
@@ -49,8 +59,10 @@ builder.Services.AddScoped<IOfficeRepository, OfficeRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IPasswordService, PasswordService>();
+builder.Services.AddScoped<IInputVerificationService, InputVerificationService>();
+
 
 builder.Services.AddHostedService<ClearBookingsService>();
 
@@ -66,11 +78,18 @@ builder.Services
     .AddNewtonsoftJson(options =>
         options.SerializerSettings.ContractResolver = new DefaultContractResolver());
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAnyOrigin",
+        builder =>
+        {
+            builder.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+});
+
 var app = builder.Build();
-
-//  enable CORS (cross-ogirign resource sharing) - I'll specify this later
-app.UseCors(c => c.AllowAnyHeader().AllowAnyOrigin().AllowAnyMethod());
-
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -78,6 +97,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors("AllowAnyOrigin");
+app.UseRouting();
 
 app.UseHttpsRedirection();
 

@@ -1,16 +1,24 @@
-﻿using HotDeskBookingSystem.Data.Models;
-using HotDeskBookingSystem.Interfaces;
+﻿using HotDeskBookingSystem.Data;
+using HotDeskBookingSystem.Data.Models;
+using HotDeskBookingSystem.Interfaces.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace HotDeskBookingSystem.Repositories
 {
     public class RoleRepository : IRoleRepository
     {
+        private readonly DataContext _context;
+
+        public RoleRepository(DataContext dataContext) {
+            _context = dataContext;
+        }
+
         public Task<Role?> AddRoleAsync(Role role)
         {
             throw new NotImplementedException();
         }
 
-        public Task<Role?> DeleteRoleAsync(int roleId)
+        public Task<Role?> DeleteRoleAsync(string roleName)
         {
             throw new NotImplementedException();
         }
@@ -20,9 +28,10 @@ namespace HotDeskBookingSystem.Repositories
             throw new NotImplementedException();
         }
 
-        public Task<Role?> GetRoleByIdAsync(int roleId)
+        public Task<Role?> GetRoleByNameAsync(string roleName)
         {
-            throw new NotImplementedException();
+            return _context.Roles
+                .FirstOrDefaultAsync(r => r.RoleName == roleName);
         }
 
         public Task<Role?> UpdateRoleAsync(Role role)

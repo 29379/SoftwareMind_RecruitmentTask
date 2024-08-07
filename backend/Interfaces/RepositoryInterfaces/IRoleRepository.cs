@@ -1,13 +1,13 @@
 ﻿using HotDeskBookingSystem.Data.Models;
 
-namespace HotDeskBookingSystem.Interfaces
+namespace HotDeskBookingSystem.Interfaces.Repositories
 {
     public interface IRoleRepository
     {
-        Task<Role?> GetRoleByIdAsync(int roleId);
+        Task<Role?> GetRoleByNameAsync(string roleName);
         Task<IEnumerable<Role>> GetAllRolesAsync();
         Task<Role?> AddRoleAsync(Role role);
         Task<Role?> UpdateRoleAsync(Role role);
-        Task<Role?> DeleteRoleAsync(int roleId);
+        Task<Role?> DeleteRoleAsync(string roleName);
     }
 }

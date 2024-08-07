@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json;
 namespace HotDeskBookingSystem.Data.Models
 {
     public class AppUser
@@ -14,11 +15,12 @@ namespace HotDeskBookingSystem.Data.Models
         [StringLength(100)]
         public string LastName { get; set; }
         [Required]
-        [MinLength(8)]
-        [StringLength(50)]
+        [JsonIgnore]
         public string HashPassword { get; set; }
 
+        [JsonIgnore]
         public ICollection<Booking> Bookings { get; set; }
+        [JsonIgnore]
         public ICollection<UserRole> UserRoles { get; set; }
     }
 }

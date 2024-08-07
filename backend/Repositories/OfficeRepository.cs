@@ -1,5 +1,5 @@
 ﻿using HotDeskBookingSystem.Data.Models;
-using HotDeskBookingSystem.Interfaces;
+using HotDeskBookingSystem.Interfaces.Repositories;
 
 namespace HotDeskBookingSystem.Repositories
 {

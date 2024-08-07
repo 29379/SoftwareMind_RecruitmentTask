@@ -1,6 +1,6 @@
 ﻿using HotDeskBookingSystem.Data;
 using HotDeskBookingSystem.Data.Models;
-using HotDeskBookingSystem.Interfaces;
+using HotDeskBookingSystem.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace HotDeskBookingSystem.Repositories

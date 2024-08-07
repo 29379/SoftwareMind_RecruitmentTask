@@ -1,16 +1,16 @@
 ﻿using HotDeskBookingSystem.Data.Dto;
 using HotDeskBookingSystem.Data.Models;
 
-namespace HotDeskBookingSystem.Interfaces
+namespace HotDeskBookingSystem.Interfaces.Repositories
 {
     public interface IAppUserRepository
     {
-        // BASIC CRUD
+        Task<bool> UserExistsAsync(string email);
         Task<AppUser?> GetUserByEmailAsync(string email);
         Task<IEnumerable<AppUser>> GetAllUsersAsync();
-        Task<AppUser?> RegisterUserAsync(AppUser user);
+        Task<AppUser?> RegisterUserAsync(RegisterDto registerDto);
         Task<AppUser?> LoginUserAsync(LoginDto user);
-        Task<AppUser?> UpdateUserAsync(AppUser user);
+        Task<AppUser?> UpdateUserAsync(UpdateUserDto userDto);
         Task<AppUser?> DeleteUserAsync(string email);
     }
 }

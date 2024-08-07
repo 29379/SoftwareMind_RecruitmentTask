@@ -1,6 +1,6 @@
 ﻿using HotDeskBookingSystem.Data.Models;
 
-namespace HotDeskBookingSystem.Interfaces
+namespace HotDeskBookingSystem.Interfaces.Repositories
 {
     public interface IBookingRepository
     {

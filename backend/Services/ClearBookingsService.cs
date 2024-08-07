@@ -1,17 +1,18 @@
-﻿using HotDeskBookingSystem.Interfaces;
+﻿using HotDeskBookingSystem.Interfaces.Repositories;
+using HotDeskBookingSystem.Interfaces.ServiceInterfaces;
 
 namespace HotDeskBookingSystem.Services
 {
-    public class ClearBookingsService : IHostedService, IDisposable
+    public class ClearBookingsService : IHostedService, IDisposable, IClearBookingsService
     {
-        private readonly IBookingRepository _bookingRepository;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<ClearBookingsService> _logger;
         private Timer _timer;
         private CancellationTokenSource _cancellationTokenSource;
 
-        public ClearBookingsService(IBookingRepository bookingRepository, ILogger<ClearBookingsService> logger)
+        public ClearBookingsService(IServiceScopeFactory scopeFactory, ILogger<ClearBookingsService> logger)
         {
-            _bookingRepository = bookingRepository;
+            _scopeFactory = scopeFactory;
             _logger = logger;
         }
 
@@ -23,41 +24,43 @@ namespace HotDeskBookingSystem.Services
                 async _ => await ClearOldBookings(_cancellationTokenSource.Token),
                 null,
                 TimeSpan.Zero,
-                TimeSpan.FromHours(6)
-            ); 
+                TimeSpan.FromMinutes(1)
+            );
             return Task.CompletedTask;
         }
 
-        private async Task ClearOldBookings(object state)
+        private async Task ClearOldBookings(CancellationToken token)
         {
             _logger.LogInformation("ClearBookingsService is working.");
             try
             {
-                var completedBookingsTask = _bookingRepository
-                    .GetAllBookingsByBookingStatusAsync("COMPLETED");
-                var canceledBookingsTask = _bookingRepository
-                    .GetAllBookingsByBookingStatusAsync("CANCELED");
-                await Task.WhenAll(completedBookingsTask, canceledBookingsTask);
-
-                var bookings = completedBookingsTask.Result.Concat(canceledBookingsTask.Result);
-                var cutoffDate = DateTime.Now.AddDays(-7);
-
-                var oldBookings = bookings
-                    .Where(b => b.endTime < cutoffDate)
-                    .ToList();
-
-                foreach (var booking in oldBookings)
+                using (var scope = _scopeFactory.CreateScope())
                 {
-                    await _bookingRepository.DeleteBookingAsync(booking.BookingId);
-                    _logger.LogInformation($"Old booking with id: {booking.BookingId} was deleted.");
+                    var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
+
+                    var completedBookingsTask = await bookingRepository.GetAllBookingsByBookingStatusAsync("COMPLETED");
+                    var canceledBookingsTask = await bookingRepository.GetAllBookingsByBookingStatusAsync("CANCELED");
+
+                    var bookings = completedBookingsTask.Concat(canceledBookingsTask);
+                    var cutoffDate = DateTime.Now.AddDays(-7);
+
+                    var oldBookings = bookings
+                        .Where(b => b.endTime < cutoffDate)
+                        .ToList();
+
+                    foreach (var booking in oldBookings)
+                    {
+                        await bookingRepository.DeleteBookingAsync(booking.BookingId, token);
+                        _logger.LogInformation($"Old booking with id: {booking.BookingId} was deleted.");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while clearing old bookings.");
+                _logger.LogError(ex, "An error occurred while clearing old bookings\n" + ex.Message + "\n" + ex.Source + "\n");
             }
         }
-        
+
         public Task StopAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("ClearBookingsService is stopping.");
@@ -73,5 +76,9 @@ namespace HotDeskBookingSystem.Services
             _cancellationTokenSource?.Dispose();
         }
 
+        Task IClearBookingsService.ClearOldBookings(CancellationToken token)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
