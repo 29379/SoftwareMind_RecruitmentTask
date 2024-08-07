@@ -1,4 +1,5 @@
 ﻿using HotDeskBookingSystem.Data;
+using HotDeskBookingSystem.Data.Dto;
 using HotDeskBookingSystem.Data.Models;
 using HotDeskBookingSystem.Exceptions;
 using HotDeskBookingSystem.Interfaces.Repositories;
@@ -70,9 +71,9 @@ namespace HotDeskBookingSystem.Repositories
                 .ToListAsync();
         }
 
-        public async Task<Booking?> BookDeskAsync(string email, int deskId, DateTime startOfReservation, DateTime endOfReservation)
+        public async Task<Booking?> BookDeskAsync(string email, int deskId, ReservationTimesDto reservationTimes)
         {
-            var canBookDesk = await checkIfBookingIsPossible(email, deskId, startOfReservation, endOfReservation);
+            var canBookDesk = await checkIfBookingIsPossible(email, deskId, reservationTimes);
             if (!canBookDesk.Success)
             {
                 switch (canBookDesk.FailureReason)
@@ -82,10 +83,10 @@ namespace HotDeskBookingSystem.Repositories
                     case BookingCheckFailureReason.DeskNotFound:
                         throw new NotFoundException("Desk with ID: " + deskId + " not found");
                     case BookingCheckFailureReason.DeskNotAvailable:
-                        throw new DeskNotAvailableException("Desk with ID: " + deskId + " not available from " + startOfReservation + " to " + endOfReservation);
+                        throw new DeskNotAvailableException("Desk with ID: " + deskId + " not available from " + reservationTimes.start + " to " + reservationTimes.end);
                     default:
                         throw new InvalidDataException("An unexpected error occured. Booking the desk with id: "
-                            + deskId + "from " + startOfReservation + " to " + endOfReservation + " is not possible");
+                            + deskId + "from " + reservationTimes.start + " to " + reservationTimes.end + " is not possible");
                 }
             }
             var newBooking = new Booking
@@ -93,8 +94,8 @@ namespace HotDeskBookingSystem.Repositories
                 UserEmail = email,
                 DeskId = deskId,
                 BookingStatusName = "BOOKED",
-                startTime = startOfReservation,
-                endTime = endOfReservation
+                startTime = reservationTimes.start,
+                endTime = reservationTimes.end
             };
             _context.Bookings.Add(newBooking);
             await _context.SaveChangesAsync();
@@ -146,8 +147,14 @@ namespace HotDeskBookingSystem.Repositories
 
         //  - - - helper content - - -
 
-        public async Task<BookingCheckResult> checkIfBookingIsPossible(string email, int deskId, DateTime startOfReservation, DateTime endOfReservation)
+        public async Task<BookingCheckResult> checkIfBookingIsPossible(string email, int deskId, ReservationTimesDto reservationTimes)
         {
+            if (reservationTimes.end <= reservationTimes.start && reservationTimes.start >= DateTime.Now.AddDays(1))
+            {
+                throw new InvalidInputException("End time must be after start time, and start time must be" +
+                    " at least 24 hours from now for a booking to be valid");
+            }
+
             var user = await _context.Users
                 .FindAsync(email);
             if (user == null)
@@ -171,13 +178,13 @@ namespace HotDeskBookingSystem.Repositories
             }
 
             bool isAvailable = await _deskRepository
-                .IsDeskAvailableAsync(deskId, startOfReservation, endOfReservation);
+                .IsDeskAvailableAsync(deskId, reservationTimes);
             if (!isAvailable)
             {
                 return new BookingCheckResult
                 {
                     Success = false,
-                    Message = $"Desk with ID '{deskId}' is not available from '{startOfReservation}' to '{endOfReservation}'.",
+                    Message = $"Desk with ID '{deskId}' is not available from '{reservationTimes.start}' to '{reservationTimes.end}'.",
                     FailureReason = BookingCheckFailureReason.DeskNotAvailable
                 };
             }

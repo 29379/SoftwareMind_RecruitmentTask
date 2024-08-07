@@ -7,6 +7,7 @@ using HotDeskBookingSystem.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace HotDeskBookingSystem.Controllers
@@ -109,7 +110,7 @@ namespace HotDeskBookingSystem.Controllers
             return Ok(user);
         }
 
-        [HttpPut("{email}")]
+        [HttpPut]
         [Authorize(Policy = "EmployeePolicy")]
         public async Task<IActionResult> UpdateUserAsync([FromBody] UpdateUserDto updatedUserDto)
         {
@@ -125,12 +126,19 @@ namespace HotDeskBookingSystem.Controllers
             }
 
 
-            var result = await _appUserRepository.UpdateUserAsync(updatedUserDto);
+            var result = await _appUserRepository
+                .UpdateUserAsync(updatedUserDto);
             if (result == null)
             {
                 return StatusCode(500, "Error updating user");
             }
-            return Ok(_mapper.Map<AppUserDto>(result));
+
+            var token = _jwtTokenService.GenerateJwtToken(result);
+            return Ok(new
+            {
+                User = _mapper.Map<AppUserDto>(result),
+                Token = token
+            });
         }
 
 
@@ -149,12 +157,20 @@ namespace HotDeskBookingSystem.Controllers
                 return Unauthorized("You do not have permission to delete this user");
             }
 
+            var jti = User.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+
             var deletedUser = await _appUserRepository
                 .DeleteUserAsync(email);
             if (deletedUser == null)
             {
                 return NotFound("User " + email + " not found");
             }
+
+            if (jti != null)
+            {
+                _jwtTokenService.RemoveToken(jti);
+            }
+
             return Ok(deletedUser);
         }
 

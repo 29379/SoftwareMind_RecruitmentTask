@@ -8,7 +8,26 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Serialization;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
+
+static bool LifetimeValidator(
+    DateTime? notBefore, 
+    DateTime? expires, 
+    SecurityToken token, 
+    TokenValidationParameters @params
+)
+{
+    if (expires != null)
+    {
+        if (DateTime.UtcNow < expires)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,10 +53,27 @@ builder.Services.AddAuthentication(options =>
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])
-            )
+            ),
+            LifetimeValidator = LifetimeValidator,
+            RoleClaimType = ClaimTypes.Role
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                var tokenStore = context.HttpContext.RequestServices.GetRequiredService<TokenStore>();
+                var jti = context.Principal.FindFirstValue(JwtRegisteredClaimNames.Jti);
+
+                if (!string.IsNullOrEmpty(jti) && !tokenStore.IsTokenActive(jti))
+                {
+                    context.Fail("Token is not active");
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -63,6 +99,7 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IInputVerificationService, InputVerificationService>();
 
+builder.Services.AddSingleton<TokenStore>();
 
 builder.Services.AddHostedService<ClearBookingsService>();
 
