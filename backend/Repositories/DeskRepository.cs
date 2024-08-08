@@ -1,5 +1,6 @@
 ﻿using HotDeskBookingSystem.Data;
-using HotDeskBookingSystem.Data.Dto;
+using HotDeskBookingSystem.Data.Dto.Booking;
+using HotDeskBookingSystem.Data.Dto.Desk;
 using HotDeskBookingSystem.Data.Models;
 using HotDeskBookingSystem.Exceptions;
 using HotDeskBookingSystem.Interfaces.Repositories;
@@ -52,20 +53,27 @@ namespace HotDeskBookingSystem.Repositories
             return toBeDeleted;
         }
 
-        public async Task<IEnumerable<Desk>> GetAllDesksAsync()
+        public async Task<IEnumerable<DeskDto>> GetAllDesksAsync()
         {
             return await _context.Desks
-                .Include(d => d.OfficeFloor)
-                .ThenInclude(f => f.Office)
+                .Select(d => new DeskDto
+                {
+                    DeskId = d.DeskId,
+                    OfficeId = d.OfficeFloor.OfficeId,
+                    OfficeFloorId = d.OfficeFloorId,
+                    FloorNumber = d.OfficeFloor.FloorNumber,
+                    Bookings = d.Bookings.Select(b => new BookingInfoDto
+                    {
+                        UserEmail = b.UserEmail,
+                        StartTime = b.startTime.ToString("dd/MM/yyyy, HH:mm"),
+                        EndTime = b.endTime.ToString("dd/MM/yyyy, HH:mm")
+                    }).ToList()
+                })
                 .ToListAsync();
         }
 
         public async Task<IEnumerable<Desk>> GetAvailableDesksByOfficeIdAsync(int officeId, ReservationTimesDto reservationTimes)
         {
-            if (reservationTimes.end <= reservationTimes.start && reservationTimes.start >= DateTime.Now.AddDays(1)) {
-                throw new InvalidInputException("End time must be after start time for a booking to be valid");
-            }
-
             var floors = await _context.Floors
                 .Where(f => f.OfficeId == officeId)
                 .ToListAsync();
@@ -79,18 +87,16 @@ namespace HotDeskBookingSystem.Repositories
                 foreach (var desk in desksPerFloor)
                 {
                     var bookingsForDesk = await _context.Bookings
-                        .Where(
-                            b => b.DeskId == desk.DeskId
-                                && 
-                            b.BookingStatusName == "BOOKED"
-                                &&
-                            (
-                                b.endTime > reservationTimes.start && b.endTime < reservationTimes.end
-                                    ||
-                                b.startTime > reservationTimes.start && b.startTime < reservationTimes.end
+                    .Where(
+                        b => b.DeskId == desk.DeskId
+                            && b.BookingStatusName == "BOOKED"
+                            && (
+                                b.startTime < reservationTimes.End
+                                && b.endTime > reservationTimes.Start
                             )
-                        )
-                        .ToListAsync();
+                    )
+                    .ToListAsync();
+
                     if (bookingsForDesk.Count == 0)
                     {
                         availableDesks.Add(desk);
@@ -100,41 +106,122 @@ namespace HotDeskBookingSystem.Repositories
             return availableDesks;
         }
 
-        public async Task<Desk?> GetDeskByIdAsync(int deskId)
+        public async Task<IEnumerable<Desk>> GetAvailableDesksByOfficeFloorIdAsync(int officeFloorId, ReservationTimesDto reservationTimes)
+        {
+            if (reservationTimes.End <= reservationTimes.Start && reservationTimes.Start >= DateTime.Now.AddDays(1))
+            {
+                throw new InvalidInputException("End time must be after start time for a booking to be valid");
+            }
+
+            var floor = await _context.Floors
+                .FindAsync(officeFloorId);
+            if (floor == null)
+            {
+                throw new NotFoundException($"Office floor with id {officeFloorId} not found");
+            }
+
+            var availableDesks = new List<Desk>();
+            var desksPerFloor = await _context.Desks
+                .Where(d => d.OfficeFloorId == floor.OfficeFloorId)
+                .ToListAsync();
+
+            foreach (var desk in desksPerFloor)
+            {
+                var bookingsForDesk = await _context.Bookings
+                    .Where(
+                        b => b.DeskId == desk.DeskId
+                            &&
+                        b.BookingStatusName == "BOOKED"
+                            &&
+                        (
+                            b.endTime > reservationTimes.Start && b.endTime < reservationTimes.End
+                                ||
+                            b.startTime > reservationTimes.Start && b.startTime < reservationTimes.End
+                        )
+                    )
+                    .ToListAsync();
+                if (bookingsForDesk.Count == 0)
+                {
+                    availableDesks.Add(desk);
+                }
+            }
+       
+            return availableDesks;
+        }
+
+        public async Task<DeskDto?> GetDeskByIdAsync(int deskId)
         {
             return await _context.Desks
-                .Include(d => d.OfficeFloor)
-                .ThenInclude(f => f.Office)
-                .Include(d => d.Bookings)
-                .ThenInclude(b => b.User.Email)
+                .Select(d => new DeskDto
+                {
+                    DeskId = d.DeskId,
+                    OfficeId = d.OfficeFloor.OfficeId,
+                    OfficeFloorId = d.OfficeFloorId,
+                    FloorNumber = d.OfficeFloor.FloorNumber,
+                    Bookings = d.Bookings.Select(b => new BookingInfoDto
+                    {
+                        UserEmail = b.UserEmail,
+                        StartTime = b.startTime.ToString("dd/MM/yyyy, HH:mm"),
+                        EndTime = b.endTime.ToString("dd/MM/yyyy, HH:mm")
+                    }).ToList()
+                })
                 .FirstOrDefaultAsync(d => d.DeskId == deskId);
         }
 
-        public async Task<IEnumerable<Desk>> GetDesksByOfficeFloorIdAsync(int officeFloorId)
+        public async Task<IEnumerable<DeskDto>> GetDesksByOfficeFloorIdAsync(int officeFloorId)
         {
             return await _context.Desks
                 .Where(d => d.OfficeFloorId == officeFloorId)
-                .Include(d => d.OfficeFloor)
-                .ThenInclude(f => f.Office)
+                .Select(d => new DeskDto
+                {
+                    DeskId = d.DeskId,
+                    OfficeId = d.OfficeFloor.OfficeId,
+                    OfficeFloorId = d.OfficeFloorId,
+                    FloorNumber = d.OfficeFloor.FloorNumber,
+                    Bookings = d.Bookings.Select(b => new BookingInfoDto
+                    {
+                        UserEmail = b.UserEmail,
+                        StartTime = b.startTime.ToString("dd/MM/yyyy, HH:mm"),
+                        EndTime = b.endTime.ToString("dd/MM/yyyy, HH:mm")
+                    }).ToList()
+                })
                 .ToListAsync();
+
         }
 
-        public async Task<IEnumerable<Desk>> GetDesksByOfficeIdAsync(int officeId)
+        public async Task<IEnumerable<DeskDto>> GetDesksByOfficeIdAsync(int officeId)
         {
             var floors = await _context.Floors
                 .Where(f => f.OfficeId == officeId)
                 .ToListAsync();
 
-            var desks = new List<Desk>();
+            var deskDtos = new List<DeskDto>();
+
             foreach (var floor in floors)
             {
                 var desksPerFloor = await _context.Desks
                     .Where(d => d.OfficeFloorId == floor.OfficeFloorId)
+                    .Select(d => new DeskDto
+                    {
+                        DeskId = d.DeskId,
+                        OfficeId = d.OfficeFloor.OfficeId,
+                        OfficeFloorId = d.OfficeFloorId,
+                        FloorNumber = d.OfficeFloor.FloorNumber,
+                        Bookings = d.Bookings.Select(b => new BookingInfoDto
+                        {
+                            UserEmail = b.UserEmail,
+                            StartTime = b.startTime.ToString("dd/MM/yyyy, HH:mm"),
+                            EndTime = b.endTime.ToString("dd/MM/yyyy, HH:mm")
+                        }).ToList()
+                    })
                     .ToListAsync();
-                desks.AddRange(desksPerFloor);
+
+                deskDtos.AddRange(desksPerFloor);
             }
-            return desks;
+
+            return deskDtos;
         }
+
 
         public async Task<Desk?> UpdateDeskAsync(Desk desk)
         {
@@ -168,7 +255,7 @@ namespace HotDeskBookingSystem.Repositories
 
         public async Task<bool> IsDeskAvailableAsync(int deskId, ReservationTimesDto reservationTimes)
         {
-            if (reservationTimes.end <= reservationTimes.start )
+            if (reservationTimes.End <= reservationTimes.Start )
             {
                 throw new InvalidInputException("End time must be after start time for a booking to be valid");
             }
@@ -179,9 +266,9 @@ namespace HotDeskBookingSystem.Repositories
                     b.BookingStatusName == "BOOKED"
                         &&
                     (
-                        b.endTime > reservationTimes.start && b.endTime < reservationTimes.end
+                        b.endTime > reservationTimes.Start && b.endTime < reservationTimes.End
                             ||
-                        b.startTime > reservationTimes.start && b.startTime < reservationTimes.end
+                        b.startTime > reservationTimes.Start && b.startTime < reservationTimes.End
                     )
                 )
                 .ToListAsync();

@@ -1,4 +1,5 @@
-﻿using HotDeskBookingSystem.Interfaces.Repositories;
+﻿using HotDeskBookingSystem.Data.Models;
+using HotDeskBookingSystem.Interfaces.Repositories;
 using HotDeskBookingSystem.Interfaces.ServiceInterfaces;
 
 namespace HotDeskBookingSystem.Services
@@ -38,6 +39,17 @@ namespace HotDeskBookingSystem.Services
                 {
                     var bookingRepository = scope.ServiceProvider.GetRequiredService<IBookingRepository>();
 
+                    var bookedBookings = await bookingRepository.GetAllBookingsByBookingStatusAsync("BOOKED");
+
+                    foreach (var booking in bookedBookings)
+                    {
+                        if (booking.endTime < DateTime.Now.AddDays(-7))
+                        {
+                            await bookingRepository.ChangeBookingStatus(booking.BookingId, "COMPLETED");
+                            _logger.LogInformation($"Old booking with id: {booking.BookingId} was updated.");
+                        }
+                    }
+                    
                     var completedBookingsTask = await bookingRepository.GetAllBookingsByBookingStatusAsync("COMPLETED");
                     var canceledBookingsTask = await bookingRepository.GetAllBookingsByBookingStatusAsync("CANCELED");
 
@@ -50,7 +62,7 @@ namespace HotDeskBookingSystem.Services
 
                     foreach (var booking in oldBookings)
                     {
-                        await bookingRepository.DeleteBookingAsync(booking.BookingId, token);
+                        await bookingRepository.DeleteBookingAutomaticallyAsync(booking.BookingId, token);
                         _logger.LogInformation($"Old booking with id: {booking.BookingId} was deleted.");
                     }
                 }

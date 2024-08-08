@@ -1,5 +1,8 @@
 ﻿using AutoMapper;
 using HotDeskBookingSystem.Data.Dto;
+using HotDeskBookingSystem.Data.Dto.Booking;
+using HotDeskBookingSystem.Data.Dto.Desk;
+using HotDeskBookingSystem.Data.Dto.User;
 using HotDeskBookingSystem.Data.Models;
 
 namespace HotDeskBookingSystem.Data
@@ -8,6 +11,12 @@ namespace HotDeskBookingSystem.Data
     {
         public MappingProfiles()
         {
+            CreateMap<BookingInfoDto, Booking>();
+            CreateMap<CreateBookingDto, Booking>();
+
+            CreateMap<DeskCreationDto, Desk>();
+            CreateMap<DeskDto, Desk>();
+
             CreateMap<RegisterDto, AppUser>();
             CreateMap<LoginDto, AppUser>();
             CreateMap<AppUser, AppUserDto>()
@@ -19,6 +28,9 @@ namespace HotDeskBookingSystem.Data
                         )
                 );
             CreateMap<UpdateUserDto, AppUser>();
+
+            CreateMap<OfficeDto, Office>();
+            CreateMap<OfficeFloorDto, OfficeFloor>();
         }
     }
 }

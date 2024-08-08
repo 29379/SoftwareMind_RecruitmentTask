@@ -1,5 +1,5 @@
 ﻿using HotDeskBookingSystem.Data;
-using HotDeskBookingSystem.Data.Dto;
+using HotDeskBookingSystem.Data.Dto.User;
 using HotDeskBookingSystem.Data.Models;
 using HotDeskBookingSystem.Exceptions;
 using HotDeskBookingSystem.Interfaces.Repositories;

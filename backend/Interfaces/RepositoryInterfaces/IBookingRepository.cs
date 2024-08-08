@@ -1,4 +1,4 @@
-﻿using HotDeskBookingSystem.Data.Dto;
+﻿using HotDeskBookingSystem.Data.Dto.Booking;
 using HotDeskBookingSystem.Data.Models;
 
 namespace HotDeskBookingSystem.Interfaces.Repositories
@@ -10,9 +10,11 @@ namespace HotDeskBookingSystem.Interfaces.Repositories
         Task<IEnumerable<Booking>> GetBookingsByUserEmailAsync(string email);
         Task<IEnumerable<Booking>> GetBookingsByDeskIdAsync(int deskId);
         Task<IEnumerable<Booking>> GetAllBookingsByBookingStatusAsync(string bookingStatusName);
-        Task<Booking?> BookDeskAsync(string email, int deskId, ReservationTimesDto reservationTimes);
+        Task<Booking?> BookDeskAsync(CreateBookingDto bookingDto);
         Task<Booking?> ChangeReservationAsync(int bookingId, Booking newBooking);
         Task<Booking?> CancelReservationAsync(string email, int bookingId);
-        Task<Booking?> DeleteBookingAsync(int bookingId, CancellationToken cancellationToken);
+        Task<Booking?> DeleteBookingAutomaticallyAsync(int bookingId, CancellationToken cancellationToken);
+        Task<bool> DeleteBookingManuallyAsync(Booking booking);
+        Task<Booking> ChangeBookingStatus(int bookingId, string newStatus);
     }
 }

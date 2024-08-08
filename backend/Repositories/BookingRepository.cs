@@ -1,9 +1,10 @@
 ﻿using HotDeskBookingSystem.Data;
-using HotDeskBookingSystem.Data.Dto;
+using HotDeskBookingSystem.Data.Dto.Booking;
 using HotDeskBookingSystem.Data.Models;
 using HotDeskBookingSystem.Exceptions;
 using HotDeskBookingSystem.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace HotDeskBookingSystem.Repositories
 {
@@ -30,7 +31,8 @@ namespace HotDeskBookingSystem.Repositories
             None,
             UserNotFound,
             DeskNotFound,
-            DeskNotAvailable
+            DeskNotAvailable,
+            InvalidBookingDates
         }
 
         public async Task<IEnumerable<Booking>> GetAllBookingsAsync()
@@ -71,31 +73,34 @@ namespace HotDeskBookingSystem.Repositories
                 .ToListAsync();
         }
 
-        public async Task<Booking?> BookDeskAsync(string email, int deskId, ReservationTimesDto reservationTimes)
+        public async Task<Booking?> BookDeskAsync(CreateBookingDto bookingDto)
         {
-            var canBookDesk = await checkIfBookingIsPossible(email, deskId, reservationTimes);
+            var canBookDesk = await checkIfBookingIsPossible(bookingDto.Email, bookingDto.DeskId, bookingDto.ReservationTimes);
             if (!canBookDesk.Success)
             {
                 switch (canBookDesk.FailureReason)
                 {
                     case BookingCheckFailureReason.UserNotFound:
-                        throw new NotFoundException("User with email: " + email + " not found");
+                        throw new NotFoundException("User with email: " + bookingDto.Email + " not found");
                     case BookingCheckFailureReason.DeskNotFound:
-                        throw new NotFoundException("Desk with ID: " + deskId + " not found");
+                        throw new NotFoundException("Desk with ID: " + bookingDto.DeskId + " not found");
                     case BookingCheckFailureReason.DeskNotAvailable:
-                        throw new DeskNotAvailableException("Desk with ID: " + deskId + " not available from " + reservationTimes.start + " to " + reservationTimes.end);
+                        throw new DeskNotAvailableException("Desk with ID: " + bookingDto.DeskId + " not available from " + bookingDto.ReservationTimes.Start + " to " + bookingDto.ReservationTimes.End);
+                    case BookingCheckFailureReason.InvalidBookingDates:
+                        throw new InvalidDataException($"Invalid booking dates. {bookingDto.ReservationTimes.Start} and {bookingDto.ReservationTimes.End} do not follow the rules of this service.");
                     default:
                         throw new InvalidDataException("An unexpected error occured. Booking the desk with id: "
-                            + deskId + "from " + reservationTimes.start + " to " + reservationTimes.end + " is not possible");
+                            + bookingDto.DeskId + "from " + bookingDto.ReservationTimes.Start + " to " + bookingDto.ReservationTimes.End + " is not possible");
                 }
             }
+            
             var newBooking = new Booking
             {
-                UserEmail = email,
-                DeskId = deskId,
+                UserEmail = bookingDto.Email,
+                DeskId = bookingDto.DeskId,
                 BookingStatusName = "BOOKED",
-                startTime = reservationTimes.start,
-                endTime = reservationTimes.end
+                startTime = new DateTime(bookingDto.ReservationTimes.Start.Year, bookingDto.ReservationTimes.Start.Month, bookingDto.ReservationTimes.Start.Day, 7, 0, 0),
+                endTime = new DateTime(bookingDto.ReservationTimes.End.Year, bookingDto.ReservationTimes.End.Month, bookingDto.ReservationTimes.End.Day, 22, 0, 0)
             };
             _context.Bookings.Add(newBooking);
             await _context.SaveChangesAsync();
@@ -123,16 +128,22 @@ namespace HotDeskBookingSystem.Repositories
             {
                 throw new NotFoundException("Booking with ID: " + bookingId + " not found");
             }
+            if (toBeChanged.startTime < DateTime.Now.AddHours(24))
+            {
+                throw new UnsupportedOperationException("Cannot change a booking that is less than 24 hours from now");
+            }
+
             toBeChanged.UserEmail = newBooking.UserEmail;
             toBeChanged.DeskId = newBooking.DeskId;
             toBeChanged.startTime = newBooking.startTime;
             toBeChanged.endTime = newBooking.endTime;
             toBeChanged.BookingStatusName = newBooking.BookingStatusName;
+            
             await _context.SaveChangesAsync();
             return toBeChanged;
         }
 
-        public async Task<Booking?> DeleteBookingAsync(int bookingId, CancellationToken cancellationToken)
+        public async Task<Booking?> DeleteBookingAutomaticallyAsync(int bookingId, CancellationToken cancellationToken)
         {
             var toBeDeleted = await _context.Bookings
                 .FindAsync(bookingId);
@@ -145,14 +156,77 @@ namespace HotDeskBookingSystem.Repositories
             return null;
         } 
 
+        public async Task<bool> DeleteBookingManuallyAsync(Booking booking)
+        {
+            _context.Bookings.Remove(booking);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<Booking?> ChangeBookingStatus(int bookingId, string newStatus)
+        {
+            var status = await _context.BookingStatuses
+                .FindAsync(newStatus);
+            if (status == null)
+            {
+                throw new NotFoundException("Booking status with name: " + newStatus + "not found");
+            }
+            var toBeChanged = await _context.Bookings
+                .FindAsync(bookingId);
+            if (toBeChanged == null)
+            {
+                throw new NotFoundException("Booking with ID: " + bookingId + " not found");
+            }
+
+            toBeChanged.BookingStatusName = newStatus;
+            toBeChanged.BookingStatus = status;
+            await _context.SaveChangesAsync();
+            return toBeChanged;
+        }
         //  - - - helper content - - -
 
         public async Task<BookingCheckResult> checkIfBookingIsPossible(string email, int deskId, ReservationTimesDto reservationTimes)
         {
-            if (reservationTimes.end <= reservationTimes.start && reservationTimes.start >= DateTime.Now.AddDays(1))
+            if (reservationTimes.End <= reservationTimes.Start)
             {
-                throw new InvalidInputException("End time must be after start time, and start time must be" +
-                    " at least 24 hours from now for a booking to be valid");
+                return new BookingCheckResult
+                {
+                    Success = false,
+                    Message = $"End time must be later than start time.",
+                    FailureReason = BookingCheckFailureReason.InvalidBookingDates
+                };
+            }
+
+            var reservationStartDate = reservationTimes.Start;
+            var reservationEndDate = reservationTimes.End;
+            var startDateTime = new DateTime(reservationStartDate.Year, reservationStartDate.Month, reservationStartDate.Day, 7, 0, 0);
+            if (startDateTime < DateTime.Now.AddHours(24))
+            {
+                return new BookingCheckResult
+                {
+                    Success = false,
+                    Message = $"Start time ({startDateTime}) must be at least 24 hours from now ({DateTime.Now})",
+                    FailureReason = BookingCheckFailureReason.InvalidBookingDates
+                };
+            }
+
+            int totalDays = 0;
+            for (var date = reservationStartDate; date <= reservationEndDate; date = date.AddDays(1))
+            {
+                if (date.DayOfWeek != DayOfWeek.Saturday && date.DayOfWeek != DayOfWeek.Sunday)
+                {
+                    totalDays++;
+                }
+            }
+            if (totalDays > 5)
+            {
+                return new BookingCheckResult
+                {
+                    Success = false,
+                    Message = $"A maximum booking duration length is a week (without weekends, 5 office days). " +
+                    $"You tried to make a booking for {totalDays} days.",
+                    FailureReason = BookingCheckFailureReason.InvalidBookingDates
+                };
             }
 
             var user = await _context.Users
@@ -184,7 +258,7 @@ namespace HotDeskBookingSystem.Repositories
                 return new BookingCheckResult
                 {
                     Success = false,
-                    Message = $"Desk with ID '{deskId}' is not available from '{reservationTimes.start}' to '{reservationTimes.end}'.",
+                    Message = $"Desk with ID '{deskId}' is not available from '{reservationTimes.Start}' to '{reservationTimes.End}'.",
                     FailureReason = BookingCheckFailureReason.DeskNotAvailable
                 };
             }

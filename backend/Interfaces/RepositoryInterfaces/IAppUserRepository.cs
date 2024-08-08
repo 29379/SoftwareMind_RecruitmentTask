@@ -1,4 +1,4 @@
-﻿using HotDeskBookingSystem.Data.Dto;
+﻿using HotDeskBookingSystem.Data.Dto.User;
 using HotDeskBookingSystem.Data.Models;
 
 namespace HotDeskBookingSystem.Interfaces.Repositories

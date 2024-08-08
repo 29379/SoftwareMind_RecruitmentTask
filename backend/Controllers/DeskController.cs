@@ -1,5 +1,7 @@
-﻿using HotDeskBookingSystem.Data.Dto;
+﻿using HotDeskBookingSystem.Data.Dto.Booking;
+using HotDeskBookingSystem.Data.Dto.Desk;
 using HotDeskBookingSystem.Data.Models;
+using HotDeskBookingSystem.Exceptions;
 using HotDeskBookingSystem.Interfaces.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -19,7 +21,7 @@ namespace HotDeskBookingSystem.Controllers
         }
 
         [HttpGet("{deskId}")]
-        [Authorize(Policy = "EmployeePolicy")]
+        [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> GetDeskByIdAsync(int deskId)
         {
             var desk = await _deskRepository.GetDeskByIdAsync(deskId);
@@ -31,41 +33,65 @@ namespace HotDeskBookingSystem.Controllers
         }
 
         [HttpGet]
-        [Authorize(Policy = "EmployeePolicy")]
+        [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> GetAllDesksAsync()
         {
             var desks = await _deskRepository.GetAllDesksAsync();
             return Ok(desks);
         }
 
-        [HttpGet("{officeFloorId}")]
-        [Authorize(Policy = "EmployeePolicy")]
+        [HttpGet("floor/{officeFloorId}")]
+        [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> GetDesksByOfficeFloorIdAsync(int officeFloorId)
         {
             var desks = await _deskRepository.GetDesksByOfficeFloorIdAsync(officeFloorId);
             return Ok(desks);
         }
 
-        [HttpGet("{officeId}")]
-        [Authorize(Policy = "EmployeePolicy")]
+        [HttpGet("office/{officeId}")]
+        [Authorize(Policy = "AdminPolicy")]
         public async Task<IActionResult> GetDesksByOfficeIdAsync(int officeId)
         {
             var desks = await _deskRepository.GetDesksByOfficeIdAsync(officeId);
             return Ok(desks);
         }
 
-        [HttpGet("{officeId})")]
+        [HttpPost("office/available/{officeId}")]
         [Authorize(Policy = "EmployeePolicy")]
-        public async Task<IActionResult> GetAvailableDesksByOfficeIdAsync(int officeId, ReservationTimesDto reservationTimes)
+        public async Task<IActionResult> GetAvailableDesksByOfficeIdAsync(int officeId, [FromBody] ReservationTimesDto reservationTimes)
         {
+            if (reservationTimes.End <= reservationTimes.Start && reservationTimes.Start >= DateTime.Now.AddDays(1))
+            {
+                return BadRequest("Invalid reservation times");
+            }
+
             var desks = await _deskRepository.GetAvailableDesksByOfficeIdAsync(officeId, reservationTimes);
             return Ok(desks);
         }
 
+
+        [HttpPost("floor/available/{floorId}")]
+        [Authorize(Policy = "EmployeePolicy")]
+        public async Task<IActionResult> GetAvailableDesksByOfficeFloorIdAsync(int floorId, [FromBody] ReservationTimesDto reservationTimes)
+        {
+            if (reservationTimes.End <= reservationTimes.Start && reservationTimes.Start >= DateTime.Now.AddDays(1))
+            {
+                return BadRequest("Invalid reservation times");
+            }
+
+            var desks = await _deskRepository.GetAvailableDesksByOfficeFloorIdAsync(floorId, reservationTimes);
+            return Ok(desks);
+        }
+
+
         [HttpPost]
         [Authorize(Policy = "AdminPolicy")]
-        public async Task<IActionResult> AddDeskAsync([FromBody] Desk desk)
+        public async Task<IActionResult> AddDeskAsync([FromBody] DeskCreationDto deskDto)
         {
+            var desk = new Desk
+            {
+                OfficeFloorId = deskDto.OfficeFloorId
+            };
             var addedDesk = await _deskRepository.AddDeskAsync(desk);
             if (addedDesk == null)
             {

@@ -1,11 +1,8 @@
 ﻿using AutoMapper;
-using HotDeskBookingSystem.Data.Dto;
-using HotDeskBookingSystem.Data.Models;
-using HotDeskBookingSystem.Exceptions;
+using HotDeskBookingSystem.Data.Dto.User;
 using HotDeskBookingSystem.Interfaces.Repositories;
 using HotDeskBookingSystem.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -124,7 +121,6 @@ namespace HotDeskBookingSystem.Controllers
             {
                 return Unauthorized("You do not have permission to update this user");
             }
-
 
             var result = await _appUserRepository
                 .UpdateUserAsync(updatedUserDto);
